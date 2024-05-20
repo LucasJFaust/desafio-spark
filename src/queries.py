@@ -1,5 +1,13 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, countDistinct
+from pyspark.sql.functions import col, countDistinct, udf
+from pyspark.sql.types import BooleanType
+import os
+import sys
+
+# Adiciona o diretório raiz ao PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src import spark_setup
 
 def load_data(spark, path):
     return spark.read.csv(path, header=True, inferSchema=True, sep=';')
@@ -27,17 +35,14 @@ def count_missing_logradouro(df, spark):
 
 def count_avenida(df):
     def is_avenida(logradouro):
-        return logradouro.startswith("AVENIDA")
-
-    from pyspark.sql.functions import udf
-    from pyspark.sql.types import BooleanType
+        return logradouro and logradouro.startswith("AVENIDA")
 
     is_avenida_udf = udf(is_avenida, BooleanType())
     df = df.withColumn("is_avenida", is_avenida_udf(col("LOGRADOURO")))
 
     df.createOrReplaceTempView("estabelecimentos")
-    result = spark.sql("SELECT COUNT(*) FROM estabelecimentos WHERE is_avenida = True")
-    return result.collect()[0][0]
+    result = df.filter(df.is_avenida == True).count()
+    return result
 
 def count_unique_ceps(df):
     return df.select(countDistinct("CEP")).collect()[0][0]
@@ -49,25 +54,23 @@ def count_cultivo_estabelecimentos(df_estabelecimentos, df_cnaes):
     def is_cultivo(descricao):
         return "cultivo" in descricao.lower()
 
-    from pyspark.sql.functions import udf
-    from pyspark.sql.types import BooleanType
-
     is_cultivo_udf = udf(is_cultivo, BooleanType())
-    df_cnaes = df_cnaes.withColumn("is_cultivo", is_cultivo_udf(col("DESCRICAO")))
+    df_cnaes = df_cnaes.withColumn("is_cultivo", is_cultivo_udf(col("DESCRICAO_CNAE")))
 
-    df = df_estabelecimentos.join(df_cnaes, df_estabelecimentos.CNAE_FISCAL_PRINCIPAL == df_cnaes.CODIGO)
+    df = df_estabelecimentos.join(df_cnaes, df_estabelecimentos.CNAE_PRINCIPAL == df_cnaes.CNAE)
     df = df.filter(df.is_cultivo)
 
     return df.count()
 
 def main():
-    spark = SparkSession.builder.appName("Desafio Modulo 3").getOrCreate()
+    spark = spark_setup.get_spark_session()
 
     # Carregar dados
-    cnaes_path = "dados/cnaes/cnaes.csv"
-    estabelecimentos_path1 = "dados/estabelecimentos/estabelecimentos-1.csv"
-    estabelecimentos_path2 = "dados/estabelecimentos/estabelecimentos-2.csv"
-    estabelecimentos_path3 = "dados/estabelecimentos/estabelecimentos-3.csv"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cnaes_path = os.path.join(base_dir, "../dados/cnaes/cnaes.csv")
+    estabelecimentos_path1 = os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-1.csv")
+    estabelecimentos_path2 = os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-2.csv")
+    estabelecimentos_path3 = os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-3.csv")
 
     df_cnaes = load_data(spark, cnaes_path)
     df_estabelecimentos1 = load_data(spark, estabelecimentos_path1)
@@ -87,8 +90,8 @@ def main():
 
     # Pergunta 3: Economia de espaço com Parquet
     original_paths = [estabelecimentos_path1, estabelecimentos_path2, estabelecimentos_path3]
-    parquet_path = "dados/estabelecimentos_parquet"
-    df_estabelecimentos.write.parquet(parquet_path)
+    parquet_path = os.path.join(base_dir, "../dados/estabelecimentos_parquet")
+    df_estabelecimentos.write.mode("overwrite").parquet(parquet_path)
     original_size, parquet_size = get_space_saving(original_paths, parquet_path)
     print(f"Original size: {original_size} bytes, Parquet size: {parquet_size} bytes")
 
@@ -114,3 +117,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+

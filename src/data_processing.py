@@ -1,25 +1,35 @@
-from pyspark.sql import SparkSession
-import src.spark_setup as spark_setup
+import sys
+import os
 
-def load_data(spark, path):
-    return spark.read.csv(path, header=True, inferSchema=True, sep=';')
+# Adiciona o diretório raiz ao PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src import spark_setup
+
+def load_data(spark, *paths):
+    if len(paths) == 1:
+        return spark.read.csv(paths[0], header=True, inferSchema=True, sep=';')
+    else:
+        dfs = [spark.read.csv(path, header=True, inferSchema=True, sep=';') for path in paths]
+        df_final = dfs[0]
+        for df in dfs[1:]:
+            df_final = df_final.union(df)
+        return df_final
 
 def main():
     spark = spark_setup.get_spark_session()
 
     # Carregar dados
-    cnaes_path = "dados/cnaes/cnaes.csv"
-    estabelecimentos_path1 = "dados/estabelecimentos/estabelecimentos-1.csv"
-    estabelecimentos_path2 = "dados/estabelecimentos/estabelecimentos-2.csv"
-    estabelecimentos_path3 = "dados/estabelecimentos/estabelecimentos-3.csv"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cnaes_path = os.path.join(base_dir, "../dados/cnaes/cnaes.csv")
+    estabelecimentos_paths = [
+        os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-1.csv"),
+        os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-2.csv"),
+        os.path.join(base_dir, "../dados/estabelecimentos/estabelecimentos-3.csv")
+    ]
 
     df_cnaes = load_data(spark, cnaes_path)
-    df_estabelecimentos1 = load_data(spark, estabelecimentos_path1)
-    df_estabelecimentos2 = load_data(spark, estabelecimentos_path2)
-    df_estabelecimentos3 = load_data(spark, estabelecimentos_path3)
-
-    # Unir os DataFrames de estabelecimentos
-    df_estabelecimentos = df_estabelecimentos1.union(df_estabelecimentos2).union(df_estabelecimentos3)
+    df_estabelecimentos = load_data(spark, *estabelecimentos_paths)
 
     # Mostrar uma amostra dos dados
     df_cnaes.show(5)
@@ -27,3 +37,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
