@@ -3,8 +3,7 @@
 # Enunciado
 Bem-vindos ao Desafio do Módulo 3!
 
-Nele, você vai utilizar o Spark SQL e UDFs para responder a algumas
-perguntas a partir de dados de cadastro de estabelecimentos brasileiros.
+Nele, você vai utilizar o Spark SQL e UDFs para responder a algumas perguntas a partir de dados de cadastro de estabelecimentos brasileiros.
 Você vai trabalhar com os seguintes arquivos, disponíveis em:
 
 http://www.dcc.ufmg.br/~pcalais/XPE/engenharia-dados/big-data-spark/desafio.
@@ -41,7 +40,7 @@ desafio_modulo3/
 ├── .gitignore
 ├── pyproject.toml
 ├── README.md
-└── requirements.txt
+
 
 Qualquer dúvida fico à disposição.
 https://www.linkedin.com/in/lucas-jose-faust-machado/
